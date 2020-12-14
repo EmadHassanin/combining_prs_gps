@@ -1,0 +1,172 @@
+---
+title: "PRS_genepy"
+author: "Emad"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document: 
+    toc: true
+    toc_float: true
+    number_sections: true
+
+---
+
+```{r setup, vinclude=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, error = FALSE, message = FALSE, options(digits = 3),comment = FALSE )
+```
+
+```{r load_libraries, include=FALSE}
+# Organize uk_biobank phenotype data ----
+
+# 1.0 Load libraries ----
+print("install and loading dependencies packages")
+
+installed.packages("pacman") 
+library("pacman")
+
+#devtools::install_github("kenhanscombe/ukbtools", build_vignettes = TRUE, dependencies = TRUE, force = TRUE)
+
+pacman::p_load(tidyverse     # tidy daya
+               , ukbtools    # workhorse package for organizing ukbb
+               , tictoc      # checking time 
+               , furrr       # functional programing with map()
+               , future      # parallel computing
+               , arrow       # apache arrow provides powerful package for sharing data
+               , data.table  # exporting data as .txt
+               , ggpubr      # add themes and visualization prop. to ggplot
+               ,plotly       # interactive plots
+               ,caret        # partition data
+               ,rcompanion   # calculating R2
+               ,pROC         # calculating and plot AUC 
+               ,plotROC      # calculating and plot ggplot
+               ,gridExtra    # add table to ggplot
+               )    
+```
+
+```{r importing files, include=FALSE}
+
+print("source change_me.r file")
+source(here::here("phenotype","organize_ukbb","change_me.R"))
+source(here::here("phenotype","organize_ukbb","test.R"))
+source(here::here("phenotype","organize_ukbb","organize_ukbb.R"))
+source(here::here("PRS","import_prs_scores.R"))
+
+```
+
+# BOADICEA (313 Snps) {.tabset}
+
+## all cases
+
+```{r boadicea_all}
+predict_auc(all_scores_sum_313)
+```
+
+
+## only prevalent
+
+```{r boadicea_prev}
+predict_auc(prev_scores_sum_313)
+```
+
+## only incident
+
+```{r boadicea_inci}
+predict_auc(inc_scores_sum_313)
+```
+
+# Khera (5234 Snps) {.tabset}
+
+## all cases
+
+```{r khera_all}
+predict_auc(all_scores_sum_khera)
+```
+
+
+## only prevalent 
+
+```{r khera_prev}
+predict_auc(prev_scores_sum_khera)
+```
+
+## only incident
+
+```{r khera_inci}
+predict_auc(inc_scores_sum_khera)
+```
+
+
+# Breast Cancer Association Consortium (BCAC)  {.tabset}
+
+## all cases 
+
+```{r bcac_all}
+predict_auc(all_scores_sum_bcac)
+```
+
+
+## only prevalent
+
+```{r bcac_prev}
+predict_auc(prev_scores_sum_bcac)
+```
+
+## only incident 
+
+```{r bcac_inci}
+predict_auc(inc_scores_sum_bcac)
+```
+
+# Genepy {.tabset}
+
+## Breast Cancer {.tabset}
+
+### AUC with age and PC 
+
+```{r integrate_gps_prs}
+integrate_gps_prs(training,testing)
+
+```
+
+
+### AUC without age
+
+```{r breast_gps_prs}
+
+gps_prs(training,testing)
+
+```
+
+
+
+
+## CAD {.tabset}
+
+### AUC with age, sex and PC 
+
+```{r}
+integrate_cad_gps_prs(training_cad,testing_cad)
+```
+
+### AUC without age and sex 
+
+```{r}
+
+cad_gps_prs(training_cad,testing_cad)
+
+```
+
+
+## Diabetes II {.tabset}
+
+### AUC with age, sex and PC
+
+```{r}
+integrate_diabetes_gps_prs(training_diabetes,testing_diabetes)
+```
+
+
+### AUC without age and sex 
+
+```{r}
+diabetes_gps_prs(training_diabetes,testing_diabetes)
+```

@@ -1,0 +1,29 @@
+---
+title: "access_logs"
+author: "Emad"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document: 
+    toc: true
+    toc_float: true
+    number_sections: true
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# PRS calculation using plink
+
+plink command
+
+```
+cat chromosomes.txt | parallel "~/tools/plink2 --bgen ~/storage/uk_biobank/genotype_data/array/ukb_imp_chr{}_v3.bgen ref-first  --sample ~/storage/uk_biobank/genotype_data/array/ukb52446_imp_chr{}_v3_s487296.sample --score snps_313_final.txt --out {}"
+```
+
+count variants scanning
+
+```
+wc -l  temporary.pvar
+```

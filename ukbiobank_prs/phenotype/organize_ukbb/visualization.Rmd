@@ -1,0 +1,193 @@
+---
+title: "Explore UK Biobank data"
+author: "Emad"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document: 
+    toc: true
+    toc_float: true
+    number_sections: true
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, error = FALSE, message = FALSE, options(digits = 3), comment = NA)
+
+library("pacman")
+
+#devtools::install_github("kenhanscombe/ukbtools", build_vignettes = TRUE, dependencies = TRUE, force = TRUE)
+
+pacman::p_load(tidyverse     # tidy daya
+               , ukbtools    # workhorse package for organizing ukbb
+               , tictoc      # checking time 
+               , furrr       # functional programing with map()
+               , future      # parallel computing
+               , arrow       # apache arrow provides powerful package for sharing data
+               , data.table  # exporting data as .txt
+               , ggpubr      # add themes and visualization prop. to ggplot
+               , plotly      # interactive plots
+               )  
+```
+
+```{r load}
+source("/home/opc/projects/ukbiobank_prs/phenotype/organize_ukbb/change_me.R")
+source("/home/opc/projects/ukbiobank_prs/phenotype/organize_ukbb/test.R")
+source("/home/opc/projects/ukbiobank_prs/phenotype/organize_ukbb/organize_ukbb.R")
+```
+# Demographics {.tabset}
+
+## ethinc background
+
+```{r}
+p <- ukbb_df %>% 
+   count(ethnic_background_f21000_0_0) %>% 
+ ggplot(aes(x=ethnic_background_f21000_0_0, y = n, fill = ethnic_background_f21000_0_0))+
+   geom_bar(stat = "identity", position = "dodge", width = 0.75) +
+   coord_flip()+
+   theme(axis.text.y = element_text(angle = 60, hjust = 1))+
+   labs(x= "count")+
+   theme_pubr(legend = "none")+
+   theme(axis.title.y = element_blank())
+
+options(scipen=500000)
+ggplotly(p)
+```
+
+## sex
+
+```{r}
+
+p <- ukbb_df %>% 
+   count(sex_f31_0_0) %>% 
+   ggplot(aes(x=sex_f31_0_0, y = n, fill = sex_f31_0_0))+
+   geom_bar(stat = "identity", position = "dodge", width = 0.75) +
+   scale_fill_manual( "legend", values = c("Female" = "pink", "Male" = "grey"))+
+   coord_flip()+
+   theme(axis.text.y = element_text(angle = 60, hjust = 1))+
+   labs(x= "count")+
+   theme_pubr(legend = "none")+
+   theme(axis.title.y = element_blank())
+
+options(scipen=500000)
+ggplotly(p)
+
+
+```
+
+## age distribution
+
+```{r}
+p <- ukbb_df %>% 
+   ggplot(aes(x=age_when_attended_assessment_centre_f21003_0_0, fill = sex_f31_0_0)) + 
+   geom_density(na.rm = TRUE,alpha=0.3) +
+ #  scale_fill_manual(values = c("grey35")) +
+   scale_fill_manual(values = c( "hotpink",  "grey")) +
+   theme(legend.position = "none",
+         axis.title.x = element_text(face = "bold"),
+         panel.grid = element_blank()) +
+   labs(x = "Age") +
+   guides(fill=guide_legend(title="sex"))+
+   theme_pubr()
+
+ggplotly(p)
+```
+
+
+# Demographics of a UKB sample subset (eg BMI>25)
+
+As a quick qc step, want to look at the demographics of a particular subset of the UKB sample (BMI>25) relative to a reference sample (BMI<25).
+
+```{r demographics,, fig.height=15, fig.width=15}
+#ukbb_df<- ukbb_df 
+
+
+subgroup_of_interest <- (ukbb_df$body_mass_index_bmi_f21001_0_0 >= 25)
+
+ukb_context(ukbb_df , subset.var = subgroup_of_interest)
+
+```
+
+# Frequency of an ICD diagnosis by a target variable
+
+## Gender
+
+shows frequency of the query diagnoses with respect to gender
+
+```{r gender ,out.width = '100%'}
+
+ukb_icd_freq_by(ukbb_df , reference.var = "sex_f31_0_0", 
+  icd.code = c("^(I2[0-5])", "^(I6[0-9])", "^(J09|J1[0-9]|J2[0-2]|P23|U04)", "^(C50[0-9])"),
+  icd.labels = c("coronary artery disease", "cerebrovascular disease",
+    "lower respiratory tract infection", "breast cancer") ,
+  freq.plot = FALSE) %>%
+  select(-dx) %>%  
+  tidyr::gather(key = "disease", value = "frequency", -categorized_var) %>% 
+  ggplot2::ggplot(aes(categorized_var, frequency, group = disease,
+                      fill = disease)) +
+  labs(x = "", y = "UKB disease frequency", color = "", fill = "",
+       title = "") +
+  # theme(title = element_text(face = "bold"), panel.grid = element_blank(),
+  #       panel.background = element_rect(color = NULL,
+  #                                       fill = alpha("grey", 0.10)),
+  #       legend.key = element_blank(), axis.ticks.x = element_blank()) +
+  scale_y_continuous(labels = scales::percent_format(2))+
+  geom_bar(stat = "identity", position = "dodge",  width=0.7) +
+  guides(fill = guide_legend(ncol = 1), size = FALSE,
+         color = FALSE) +
+  theme_pubr()
+
+```
+
+## Body mass index (BMI)
+
+shows frequency of the query diagnoses with respect to BMI
+
+```{r bmi ,out.width = '100%'}
+ukb_icd_freq_by(ukbb_df , reference.var = "body_mass_index_bmi_f21001_0_0",
+  icd.code = c("^(I2[0-5])", "^(I6[0-9])", "^(J09|J1[0-9]|J2[0-2]|P23|U04)", "^(C50[0-9])"),
+  icd.labels = c("coronary artery disease", "cerebrovascular disease",
+    "lower respiratory tract infection", "breast cancer") ,
+  freq.plot = FALSE) %>% 
+  select(-dx) %>% 
+  dplyr::mutate(mid = (lower + upper) / 2) %>%
+  tidyr::gather(key = "disease", value = "frequency", -categorized_var,
+                -lower, -upper, -mid) %>%
+  ggplot2::ggplot(aes(mid, frequency, group = disease, color = disease)) +
+  labs(x = "Body mass index (BMI)", y = "UKB disease frequency", color = "", fill = "",
+       title = "")  +
+  # theme(title = element_text(face = "bold"), panel.grid = element_blank(),
+  #       panel.background = element_rect(color = NULL,
+  #                                       fill = alpha("grey", 0.10)),
+  #       legend.key = element_blank(), axis.ticks.x = element_blank()) +
+  scale_y_continuous(labels = scales::percent_format(2)) +
+  geom_point(size = 2) +
+  geom_line(size = 0.5) +
+  guides(color = guide_legend(ncol = 1), size = FALSE,
+         fill = FALSE) +
+  theme_pubr()
+
+```
+
+
+```{r,out.width = '100%', eval=FALSE}
+ukbb_df%>% 
+#  summarise( Subjects = n() , Male =  sum(sex_f31_0_0 == "Male")/Subjects , 
+#             Female = sum(sex_f31_0_0 == "Female")/Subjects) %>%
+#  select(-Subjects) %>% 
+#  gather(sex, percentage) %>% 
+  ggplot(aes(x = sex_f31_0_0,fill=sex_f31_0_0 )) +
+  geom_bar(aes(y = (..count..)/sum(..count..)),  width=0.4) +
+  geom_text(aes(y = ((..count..)/sum(..count..)), label = scales::percent((..count..)/sum(..count..))),
+            stat = "count", vjust = -0.25)  +
+  coord_flip() +
+  scale_y_continuous(labels = scales::percent, limits = c(0,1)) +
+  labs(x = "", y = "", color = "", fill = "",  title = "") +
+  theme_pubr()
+  theme(title = element_text(face = "bold"), panel.grid = element_blank(),
+        panel.background = element_rect(color = NULL,
+                                        fill = alpha("grey", 0.10)),
+        legend.key = element_blank(), axis.ticks.x = element_blank()) 
+
+```
+
+

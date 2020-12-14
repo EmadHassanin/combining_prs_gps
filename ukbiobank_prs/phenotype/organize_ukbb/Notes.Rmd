@@ -1,0 +1,89 @@
+---
+title: "Notes"
+author: "Emad"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document: 
+    toc: true
+    toc_float: true
+    number_sections: true
+
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, error = FALSE, message = FALSE, options(digits = 3))
+
+library("pacman")
+
+#devtools::install_github("kenhanscombe/ukbtools", build_vignettes = TRUE, dependencies = TRUE, force = TRUE)
+
+pacman::p_load(tidyverse     # tidy daya
+               , ukbtools    # workhorse package for organizing ukbb
+               , tictoc      # checking time 
+               , furrr       # functional programing with map()
+               , future      # parallel computing
+               , arrow       # apache arrow provides powerful package for sharing data
+               , data.table  # exporting data as .txt
+               , ggpubr      # add themes and visualization prop. to ggplot
+               )  
+```
+
+```{r load}
+source("/home/opc/projects/ukbiobank_prs/phenotype/organize_ukbb/change_me.R")
+source("/home/opc/projects/ukbiobank_prs/phenotype/organize_ukbb/test.R")
+source("/home/opc/projects/ukbiobank_prs/phenotype/organize_ukbb/organize_ukbb.R")
+```
+
+# Breast cases numbers depending on registery fields f40006,f40013 and selfreported cases
+
+```{r, echo = TRUE}
+pheno_icd_1_4 %>%
+      mutate(behaviour = case_when(
+         str_detect(behaviour_of_cancer_tumour_f40012_0_0, "Malignant") ~ "Malignant",
+         str_detect(behaviour_of_cancer_tumour_f40012_0_0, "Carcinoma") ~ "Carcinoma in situ",
+         str_detect(behaviour_of_cancer_tumour_f40012_0_0, "Benign") ~ "Benign",
+         TRUE ~ "unspecified")) %>% 
+      mutate( min_date_at_cancer_diagnosis =  apply(pheno_icd_1_4%>% select( contains("date_of_cancer_diagnosis")),
+                                                   1,min, na.rm = TRUE),
+              min_date_at_cancer_diagnosis  = ifelse(is.infinite(min_date_at_cancer_diagnosis  ), 
+                                                   NA, min_date_at_cancer_diagnosis  )) %>%
+      mutate( min_date_of_attending_assessment =  apply(pheno_icd_1_4%>% select( contains("date_of_attending_assessment")),
+                                                    1,min, na.rm = TRUE),
+              min_date_of_attending_assessment = ifelse(is.infinite(min_date_of_attending_assessment ), 
+                                                   NA, min_date_of_attending_assessment )) %>% 
+      mutate( prev_inc = case_when(
+         min_date_of_attending_assessment > min_date_at_cancer_diagnosis ~ "prevalent",
+         min_date_of_attending_assessment < min_date_at_cancer_diagnosis  ~ "incident",
+         min_date_of_attending_assessment == min_date_at_cancer_diagnosis ~ "unknown",
+      )) %>%
+      distinct(eid, .keep_all = T) %>% 
+      count(behaviour,prev_inc) %>% 
+      spread(prev_inc,n)
+```
+
+# Breast cases numbers depending on registery fields f40006,f40013 and selfreported cases
+
+```{r, echo = TRUE}
+pheno_icd_ukbtools %>%
+      mutate(behaviour = case_when(
+         str_detect(behaviour_of_cancer_tumour_f40012_0_0, "Malignant") ~ "Malignant",
+         str_detect(behaviour_of_cancer_tumour_f40012_0_0, "Carcinoma") ~ "Carcinoma in situ",
+         str_detect(behaviour_of_cancer_tumour_f40012_0_0, "Benign") ~ "Benign",
+         TRUE ~ "unspecified")) %>% 
+      mutate( min_date_at_cancer_diagnosis =  apply(pheno_icd_ukbtools %>% select( contains("date_of_cancer_diagnosis")),
+                                                   1,min, na.rm = TRUE),
+              min_date_at_cancer_diagnosis  = ifelse(is.infinite(min_date_at_cancer_diagnosis  ), 
+                                                   NA, min_date_at_cancer_diagnosis  )) %>%
+      mutate( min_date_of_attending_assessment =  apply(pheno_icd_ukbtools%>% select( contains("date_of_attending_assessment")),
+                                                    1,min, na.rm = TRUE),
+              min_date_of_attending_assessment = ifelse(is.infinite(min_date_of_attending_assessment ), 
+                                                   NA, min_date_of_attending_assessment )) %>% 
+      mutate( prev_inc = case_when(
+         min_date_of_attending_assessment > min_date_at_cancer_diagnosis ~ "prevalent",
+         min_date_of_attending_assessment < min_date_at_cancer_diagnosis  ~ "incident",
+         min_date_of_attending_assessment == min_date_at_cancer_diagnosis ~ "unknown",
+      )) %>%
+      distinct(eid, .keep_all = T) %>% 
+      count(behaviour,prev_inc) %>% 
+      spread(prev_inc,n)
+```
